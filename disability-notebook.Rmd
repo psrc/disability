@@ -1,0 +1,93 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Disability Employment Awareness
+B18120 Employment Status by Disability Status and Type (Civilian Noninstitutionalized Population 18 to 64 Years)
+B18121 Work Experience by Disability Status and Type
+B18130 Age by Disability Status by Poverty Status
+
+[Census Stats](https://www.census.gov/newsroom/stories/disability-employment-awareness-month.html)
+
+- stats by age, sex, and disability type -- can apply for just our region
+
+
+Previous blog:
+
+- people with disability (without) in the region
+- low incomes compared to those in the regions general population
+- unemployment rate for people with disabilities compared to population overall
+- people of color with disabilities and low income (+ regional average)
+- regional ORCA card, ridership of people with disabilities
+
+Check for disability topics in HHTSE
+
+Sources:
+[Coordinated Mobility Plan](https://www.psrc.org/media/6395)
+[Heritage Month Blog, 2022](https://www.psrc.org/about-us/media-hub/helping-people-all-abilities-get-work)
+Census pulse data (processed data Seattle MSA)
+
+```{r}
+library(psrccensus)
+library(psrcplot)
+library(tidyverse)
+library(tidycensus)
+```
+
+```{r, B18120 Employment Status}
+x <- get_acs_recs('county', table.names = 'B18120', years = '2022', acs.type = 'acs1')
+# x_fmt <- format_estimates(x)
+
+x02 <- x %>% 
+  mutate(variable_sort = str_extract(variable, "\\d{2}$")) %>% 
+  mutate(label02 = label) %>% 
+  separate(label02,
+           sep = ":!!",
+           into = c('total', 'in_lf', 'is_emp', 'has_dis', 'dis_type')) %>%
+  mutate(dis_type = ifelse(variable_sort %in% 23:28, has_dis, dis_type)) %>%
+  mutate(has_dis = ifelse(variable_sort %in% 22:29, is_emp, has_dis)) %>%
+  mutate(is_emp = ifelse(variable_sort %in% 22:29, NA, is_emp)) %>% 
+  mutate(in_lf = str_replace_all(in_lf, ":", ""),
+         is_emp = str_replace_all(is_emp, ":", ""),
+         has_dis = str_replace_all(has_dis, ":", ""))
+ 
+
+  
+# region ----
+
+r <- x02 %>% 
+  filter(name == 'Region')
+
+r_lf <- r %>% 
+  filter(!is.na(in_lf)) %>% 
+  group_by(name, in_lf) %>% 
+  summarise(estimate = sum(estimate), 
+            moe = moe_sum(moe = moe, estimate = estimate)) %>% 
+  mutate(se = moe/1.645) %>% 
+  mutate(cv = (se/estimate)*100)
+  
+
+
+```
+
+```{r}
+
+create_shares <- function(table) {
+  df <- format_estimates(table, type = 'share')
+  df <- df %>% 
+    rename_with(~str_replace_all(.x, 'share_moe', 'moe'), ends_with('share_moe')) 
+  
+  df <- df %>% 
+    pivot_longer(cols = King_share:Region_moe,
+                 names_to = c('county', "type"),
+                 names_sep = "_") %>% 
+    pivot_wider(names_from = type,
+                values_from = value) %>% 
+    arrange(county, variable)
+  return(df)
+}
+
+y <- create_shares(x)
+```
+
