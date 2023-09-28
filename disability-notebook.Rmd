@@ -1,41 +1,27 @@
 ---
-title: "R Notebook"
-output: html_notebook
+title: "Disability Employment"
+output: 
+  html_notebook:
+    code_folding: hide
 ---
 
 Disability Employment Awareness
 B18120 Employment Status by Disability Status and Type (Civilian Noninstitutionalized Population 18 to 64 Years)
-B18121 Work Experience by Disability Status and Type
-B18130 Age by Disability Status by Poverty Status
+<!-- B18121 Work Experience by Disability Status and Type -->
+<!-- B18130 Age by Disability Status by Poverty Status -->
 
 [Census Stats](https://www.census.gov/newsroom/stories/disability-employment-awareness-month.html)
 
-- stats by age, sex, and disability type -- can apply for just our region
-
-
-Previous blog:
-
-- people with disability (without) in the region
-- low incomes compared to those in the regions general population
-- unemployment rate for people with disabilities compared to population overall
-- people of color with disabilities and low income (+ regional average)
-- regional ORCA card, ridership of people with disabilities
-
-Check for disability topics in HHTSE
-
-Sources:
-[Coordinated Mobility Plan](https://www.psrc.org/media/6395)
-[Heritage Month Blog, 2022](https://www.psrc.org/about-us/media-hub/helping-people-all-abilities-get-work)
-Census pulse data (processed data Seattle MSA)
 
 ```{r}
 library(psrccensus)
 library(psrcplot)
 library(tidyverse)
 library(tidycensus)
+library(DT)
 ```
 
-```{r, B18120 Employment Status}
+```{r B18120 Employment Status}
 x <- get_acs_recs('county', table.names = 'B18120', years = '2022', acs.type = 'acs1')
 # x_fmt <- format_estimates(x)
 
@@ -51,43 +37,166 @@ x02 <- x %>%
   mutate(in_lf = str_replace_all(in_lf, ":", ""),
          is_emp = str_replace_all(is_emp, ":", ""),
          has_dis = str_replace_all(has_dis, ":", ""))
- 
+```
 
+```{r region}
   
-# region ----
-
 r <- x02 %>% 
   filter(name == 'Region')
+```
 
-r_lf <- r %>% 
-  filter(!is.na(in_lf)) %>% 
-  group_by(name, in_lf) %>% 
-  summarise(estimate = sum(estimate), 
+## Disability in Region (as a whole)
+
+```{r region with disability}
+w_dis <- c('04', '13', '22')
+wo_dis <- c('11', '20', '29')
+
+r_tot <- r %>% 
+  filter(variable_sort == '01') %>% 
+  select(name, denom_est = estimate, denom_moe = moe)
+
+r_dis <- r %>%
+  filter(variable_sort %in% c(w_dis, wo_dis)) %>% 
+  group_by(name, has_dis) %>%
+  summarise(estimate = sum(estimate),
+            moe = moe_sum(moe = moe, estimate = estimate)) %>%
+  mutate(se = moe/1.645) %>% 
+  mutate(cv = (se/estimate)*100) %>% 
+  left_join(r_tot, by = 'name') %>% 
+  mutate(share_est = estimate/denom_est,
+         share_moe = moe_prop(estimate, denom_est, moe, denom_moe))
+
+r_dis_fmt <- r_dis %>% 
+  select(-se, -denom_est, -denom_moe)
+
+datatable(r_dis_fmt)%>%
+  formatRound(columns=c('estimate'), digits = 0) %>% 
+  formatRound(columns=c('moe', 'cv'), digits = 2) %>% 
+  formatPercentage(c(6,7), 1)
+  
+```
+
+- 9.7% of people in the Central Puget Sound Region between the ages of 18-64 report having a disability 
+
+### Disability types
+
+```{r region disability types}
+
+#4, 13, 22 "With disability" total
+
+r_dis_type_denom <- r %>% 
+  filter(variable_sort == '01') %>% 
+  group_by(name) %>% 
+  summarise(denom_est = sum(estimate),
+            denom_moe = moe_sum(moe = moe, estimate = estimate))
+
+r_dis_type <- r %>% 
+  filter(has_dis == 'With a disability') %>% 
+  filter(!(variable_sort %in% c('04', '13', '22'))) %>% # 444,261 
+  group_by(name, dis_type) %>%
+  summarise(estimate = sum(estimate),
             moe = moe_sum(moe = moe, estimate = estimate)) %>% 
   mutate(se = moe/1.645) %>% 
-  mutate(cv = (se/estimate)*100)
+  mutate(cv = (se/estimate)*100) %>% 
+  left_join(r_dis_type_denom, by = 'name') %>% 
+  mutate(share_est = estimate/denom_est,
+         share_moe = moe_prop(estimate, denom_est, moe, denom_moe))
+
+r_dis_type_fmt <- r_dis_type %>% 
+  select(-se, -denom_est, -denom_moe)
+
+datatable(r_dis_type_fmt)%>%
+  formatRound(columns=c('estimate'), digits = 0) %>% 
+  formatRound(columns=c('moe', 'cv'), digits = 2) %>% 
+  formatPercentage(c(6,7), 1)
+
+```
+
+* Individuals can report more than one disability. Aggregating all disability types will not equal the reported 'With a disability' totals.
+
+- Most individuals in the region with a disability report at least a cognitive difficulty followed by independent living difficulty, and an ambulatory difficulty
+
+## Within the Labor Force
+
+
+```{r in labor force with disability}
+# in labor force, emp/ump, with a disability
+
+r_lf_emp_dis_denom <- r %>%
+  filter(variable_sort %in% c('01', '02')) %>%
+  mutate(label02 = label) %>% 
+  mutate(label02 = str_replace_all(label02, ".*In the labor force.*", "in_lf"),
+         label02 = str_replace_all(label02, ".*Total.*", "reg_tot")) %>% 
+  pivot_wider(id_cols = c('name'),
+              names_from = 'label02',
+              names_glue = "denom_{label02}_{.value}",
+              values_from = c('estimate', 'moe'))
   
+lf_rows <- c('04', '11', '13', '20')
+
+r_lf_emp_dis <- r %>% 
+  filter(variable_sort %in% lf_rows) %>% 
+  mutate(se = moe/1.645) %>% 
+  mutate(cv = (se/estimate)*100) %>% 
+  left_join(r_lf_emp_dis_denom, by = 'name') %>% 
+  mutate(share_est_reg = estimate/denom_reg_tot_estimate,
+         share_moe_reg = moe_prop(estimate, denom_reg_tot_estimate, moe, denom_reg_tot_moe),
+         share_est_inlf = estimate/denom_in_lf_estimate,
+         share_moe_inlf = moe_prop(estimate, denom_in_lf_estimate, moe, denom_in_lf_moe))
+  
+r_lf_emp_dis_fmt <- r_lf_emp_dis %>% 
+  select(name, in_lf, is_emp, has_dis, estimate, moe, cv, starts_with('share'))
+
+datatable(r_lf_emp_dis_fmt) %>%
+  formatRound(columns=c('estimate'), digits = 0) %>% 
+  formatRound(columns=c('moe', 'cv'), digits = 2) %>% 
+  formatPercentage(8:11, 1)
 
 
 ```
 
-```{r}
+Of those in the labor force
 
-create_shares <- function(table) {
-  df <- format_estimates(table, type = 'share')
-  df <- df %>% 
-    rename_with(~str_replace_all(.x, 'share_moe', 'moe'), ends_with('share_moe')) 
+- 6.3% (approx 139,000 persons) with a disability are employed
+- Individuals with a disability and unemployed represent 0.6% (12,700 persons) of the labor force
+
+## Not in the Labor Force
+```{r not in labor force with disability}
+# NOT in labor force, with a disability
+
+r_not_lf_dis_denom <- r %>%
+  filter(variable_sort %in% c('01', '21')) %>%
+  mutate(label02 = label) %>% 
+  mutate(label02 = str_replace_all(label02, ".*Not in labor force.*", "in_lf"),
+         label02 = str_replace_all(label02, ".*Total.*", "reg_tot")) %>% 
+  pivot_wider(id_cols = 'name',
+              names_from = 'label02',
+              names_glue = "denom_{label02}_{.value}",
+              values_from = c('estimate', 'moe'))
   
-  df <- df %>% 
-    pivot_longer(cols = King_share:Region_moe,
-                 names_to = c('county', "type"),
-                 names_sep = "_") %>% 
-    pivot_wider(names_from = type,
-                values_from = value) %>% 
-    arrange(county, variable)
-  return(df)
-}
+not_lf_rows <- c('22', '29')
 
-y <- create_shares(x)
+r_not_lf_dis <- r %>% 
+  filter(variable_sort %in% not_lf_rows) %>% 
+  mutate(se = moe/1.645) %>% 
+  mutate(cv = (se/estimate)*100) %>% 
+  left_join(r_not_lf_dis_denom, by = 'name') %>% 
+  mutate(share_est_reg = estimate/denom_reg_tot_estimate,
+         share_moe_reg = moe_prop(estimate, denom_reg_tot_estimate, moe, denom_reg_tot_moe),
+         share_est_inlf = estimate/denom_in_lf_estimate,
+         share_moe_inlf = moe_prop(estimate, denom_in_lf_estimate, moe, denom_in_lf_moe))
+  
+r_not_lf_dis_fmt <- r_not_lf_dis %>% 
+  select(name, in_lf, is_emp, has_dis, estimate, moe, cv, starts_with('share'))
+
+datatable(r_not_lf_dis_fmt) %>%
+  formatRound(columns=c('estimate'), digits = 0) %>% 
+  formatRound(columns=c('moe', 'cv'), digits = 2) %>% 
+  formatPercentage(8:11, 1)
+
+
 ```
 
+<!-- X% are not in in the labor force -->
+
+- Of those not in the labor force, 21.8% percent report a disability 
