@@ -12,6 +12,7 @@ B18120 Employment Status by Disability Status and Type (Civilian Noninstitutiona
 
 [Census Stats](https://www.census.gov/newsroom/stories/disability-employment-awareness-month.html)
 
+The charts include the coefficient of variation (CV) measures which is the relative amount of sampling error that is associated with a sample estimate. See [this article](https://psrc.github.io/psrccensus/articles/calculate-reliability-moe-transformed-acs.html) for interpretation.
 
 ```{r}
 library(psrccensus)
@@ -23,7 +24,6 @@ library(DT)
 
 ```{r B18120 Employment Status}
 x <- get_acs_recs('county', table.names = 'B18120', years = '2022', acs.type = 'acs1')
-# x_fmt <- format_estimates(x)
 
 x02 <- x %>% 
   mutate(variable_sort = str_extract(variable, "\\d{2}$")) %>% 
@@ -61,7 +61,7 @@ r_dis <- r %>%
   summarise(estimate = sum(estimate),
             moe = moe_sum(moe = moe, estimate = estimate)) %>%
   mutate(se = moe/1.645) %>% 
-  mutate(cv = (se/estimate)*100) %>% 
+  mutate(cv = (se/estimate)) %>% 
   left_join(r_tot, by = 'name') %>% 
   mutate(share_est = estimate/denom_est,
          share_moe = moe_prop(estimate, denom_est, moe, denom_moe))
@@ -72,7 +72,7 @@ r_dis_fmt <- r_dis %>%
 datatable(r_dis_fmt)%>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
   formatRound(columns=c('moe', 'cv'), digits = 2) %>% 
-  formatPercentage(c(6,7), 1)
+  formatPercentage(c(5, 6,7), 1)
   
 ```
 
@@ -97,7 +97,7 @@ r_dis_type <- r %>%
   summarise(estimate = sum(estimate),
             moe = moe_sum(moe = moe, estimate = estimate)) %>% 
   mutate(se = moe/1.645) %>% 
-  mutate(cv = (se/estimate)*100) %>% 
+  mutate(cv = (se/estimate)) %>% 
   left_join(r_dis_type_denom, by = 'name') %>% 
   mutate(share_est = estimate/denom_est,
          share_moe = moe_prop(estimate, denom_est, moe, denom_moe))
@@ -107,8 +107,8 @@ r_dis_type_fmt <- r_dis_type %>%
 
 datatable(r_dis_type_fmt)%>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
-  formatRound(columns=c('moe', 'cv'), digits = 2) %>% 
-  formatPercentage(c(6,7), 1)
+  formatRound(columns=c('moe'), digits = 2) %>% 
+  formatPercentage(c(5, 6,7), 1)
 
 ```
 
@@ -137,7 +137,7 @@ lf_rows <- c('04', '11', '13', '20')
 r_lf_emp_dis <- r %>% 
   filter(variable_sort %in% lf_rows) %>% 
   mutate(se = moe/1.645) %>% 
-  mutate(cv = (se/estimate)*100) %>% 
+  mutate(cv = (se/estimate)) %>% 
   left_join(r_lf_emp_dis_denom, by = 'name') %>% 
   mutate(share_est_reg = estimate/denom_reg_tot_estimate,
          share_moe_reg = moe_prop(estimate, denom_reg_tot_estimate, moe, denom_reg_tot_moe),
@@ -149,8 +149,8 @@ r_lf_emp_dis_fmt <- r_lf_emp_dis %>%
 
 datatable(r_lf_emp_dis_fmt) %>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
-  formatRound(columns=c('moe', 'cv'), digits = 2) %>% 
-  formatPercentage(8:11, 1)
+  formatRound(columns=c('moe'), digits = 2) %>% 
+  formatPercentage(7:11, 1)
 
 
 ```
@@ -179,7 +179,7 @@ not_lf_rows <- c('22', '29')
 r_not_lf_dis <- r %>% 
   filter(variable_sort %in% not_lf_rows) %>% 
   mutate(se = moe/1.645) %>% 
-  mutate(cv = (se/estimate)*100) %>% 
+  mutate(cv = (se/estimate)) %>% 
   left_join(r_not_lf_dis_denom, by = 'name') %>% 
   mutate(share_est_reg = estimate/denom_reg_tot_estimate,
          share_moe_reg = moe_prop(estimate, denom_reg_tot_estimate, moe, denom_reg_tot_moe),
@@ -191,8 +191,8 @@ r_not_lf_dis_fmt <- r_not_lf_dis %>%
 
 datatable(r_not_lf_dis_fmt) %>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
-  formatRound(columns=c('moe', 'cv'), digits = 2) %>% 
-  formatPercentage(8:11, 1)
+  formatRound(columns=c('moe'), digits = 2) %>% 
+  formatPercentage(7:11, 1)
 
 
 ```
@@ -200,3 +200,84 @@ datatable(r_not_lf_dis_fmt) %>%
 <!-- X% are not in in the labor force -->
 
 - Of those not in the labor force, 21.8% percent report a disability 
+
+## Work Experience by Disability Status and Type
+
+```{r B18121 Work Experience by Disability Status and Type}
+we <- get_acs_recs('county', table.names = 'B18121', years = '2022', acs.type = 'acs1')
+
+we02 <- we %>%
+  mutate(variable_sort = str_extract(variable, "\\d{2}$")) %>%
+  mutate(label02 = label) %>%
+  separate(label02,
+           sep = ":!!",
+           into = c('total', 'duration', 'has_dis', 'dis_type')) %>%
+  mutate(duration = str_replace_all(duration, ":", ""),
+         has_dis = str_replace_all(has_dis, ":", ""))
+```
+
+```{r}
+
+r_we <- we02 %>% 
+  filter(name == 'Region')
+
+exc_we_rows <- c('01', '02', '11', '12', '20', '21')
+
+r_we_denom <- r_we %>% 
+  filter(variable_sort %in% '01') %>% 
+  select(name, denom_est = estimate, denom_moe = moe)
+```
+
+```{r}
+
+
+r_we_grp <- r_we %>% 
+  filter(!(variable_sort %in% exc_we_rows)) %>% 
+  mutate(is_wrk = ifelse(str_detect(duration, "Worked.*"), "Worked", "Not Worked")) %>% 
+  group_by(name, is_wrk, has_dis) %>% 
+  summarise(estimate = sum(estimate),
+            moe = moe_sum(moe = moe, estimate = estimate)) %>% 
+  mutate(se = moe/1.645) %>% 
+  mutate(cv = (se/estimate)) %>% 
+  left_join(r_we_denom, by = 'name') %>% 
+  mutate(share_est = estimate/denom_est,
+         share_moe = moe_prop(estimate, denom_est, moe, denom_moe))
+
+r_we_grp_fmt <- r_we_grp %>% 
+  select(name, is_wrk, has_dis, estimate, moe, cv, starts_with('share'))
+
+datatable(r_we_grp_fmt ) %>%
+  formatRound(columns=c('estimate'), digits = 0) %>% 
+  formatRound(columns=c('moe'), digits = 2) %>% 
+  formatPercentage(6:8, 1)
+
+```
+
+
+```{r}
+
+# r_we_denom <- r_we %>% 
+#   filter(variable_sort %in% '01') %>% 
+#   select(name, denom_est = estimate, denom_moe = moe)
+
+r_we_dis <- r_we %>% 
+  filter(!(variable_sort %in% exc_we_rows)) %>% 
+  group_by(name, duration, has_dis) %>% 
+  summarise(estimate = sum(estimate),
+            moe = moe_sum(moe = moe, estimate = estimate)) %>%
+  mutate(se = moe/1.645) %>% 
+  mutate(cv = (se/estimate)) %>% 
+  left_join(r_we_denom, by = 'name') %>% 
+  mutate(share_est = estimate/denom_est,
+         share_moe = moe_prop(estimate, denom_est, moe, denom_moe))
+
+r_we_dis_fmt <- r_we_dis %>% 
+  select(name, duration, has_dis, estimate, moe, cv, starts_with('share'))
+
+datatable(r_we_dis_fmt) %>%
+  formatRound(columns=c('estimate'), digits = 0) %>% 
+  formatRound(columns=c('moe'), digits = 2) %>% 
+  formatPercentage(6:8, 1)
+
+```
+
