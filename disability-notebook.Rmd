@@ -1,11 +1,19 @@
 ---
 title: "Disability Employment"
-output: 
+output:
   html_notebook:
     code_folding: hide
+    
 ---
 
+```{css, echo = FALSE}
+body {
+  font-family: Poppins;
+}
+```
+
 Disability Employment Awareness
+
 B18120 Employment Status by Disability Status and Type (Civilian Noninstitutionalized Population 18 to 64 Years)
 <!-- B18121 Work Experience by Disability Status and Type -->
 <!-- B18130 Age by Disability Status by Poverty Status -->
@@ -14,15 +22,16 @@ B18120 Employment Status by Disability Status and Type (Civilian Noninstitutiona
 
 The charts include the coefficient of variation (CV) measures which is the relative amount of sampling error that is associated with a sample estimate. See [this article](https://psrc.github.io/psrccensus/articles/calculate-reliability-moe-transformed-acs.html) for interpretation.
 
-```{r}
+```{r, echo = FALSE}
 library(psrccensus)
 library(psrcplot)
 library(tidyverse)
 library(tidycensus)
 library(DT)
+library(openxlsx)
 ```
 
-```{r B18120 Employment Status}
+```{r B18120 Employment Status, echo = FALSE}
 x <- get_acs_recs('county', table.names = 'B18120', years = '2022', acs.type = 'acs1')
 
 x02 <- x %>% 
@@ -47,7 +56,7 @@ r <- x02 %>%
 
 ## Disability in Region (as a whole)
 
-```{r region with disability}
+```{r region with disability, echo = FALSE}
 w_dis <- c('04', '13', '22')
 wo_dis <- c('11', '20', '29')
 
@@ -80,7 +89,7 @@ datatable(r_dis_fmt)%>%
 
 ### Disability types
 
-```{r region disability types}
+```{r region disability types, echo = FALSE}
 
 #4, 13, 22 "With disability" total
 
@@ -115,6 +124,19 @@ datatable(r_dis_type_fmt)%>%
 * Individuals can report more than one disability. Aggregating all disability types will not equal the reported 'With a disability' totals.
 
 - Most individuals in the region with a disability report at least a cognitive difficulty followed by independent living difficulty, and an ambulatory difficulty
+
+```{r}
+ggplot(r_dis_type_fmt, aes(dis_type, share_est, fill = dis_type)) +
+  geom_col(position = 'dodge') +
+  scale_y_continuous(labels = scales::percent_format()) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) +
+  geom_errorbar(aes(ymax = share_est + share_moe, ymin = share_est - share_moe),
+                position = position_dodge2(width = 0, padding = 0.5)) +
+  labs(y = NULL,
+       x = NULL) +
+  theme(legend.title = element_blank(),
+        legend.position = "none")
+```
 
 ## Within the Labor Force
 
@@ -203,7 +225,7 @@ datatable(r_not_lf_dis_fmt) %>%
 
 ## Work Experience by Disability Status and Type
 
-```{r B18121 Work Experience by Disability Status and Type}
+```{r B18121 Work Experience by Disability Status and Type, echo = FALSE}
 we <- get_acs_recs('county', table.names = 'B18121', years = '2022', acs.type = 'acs1')
 
 we02 <- we %>%
@@ -246,11 +268,23 @@ r_we_grp <- r_we %>%
 r_we_grp_fmt <- r_we_grp %>% 
   select(name, is_wrk, has_dis, estimate, moe, cv, starts_with('share'))
 
-datatable(r_we_grp_fmt ) %>%
+datatable(r_we_grp_fmt) %>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
   formatRound(columns=c('moe'), digits = 2) %>% 
   formatPercentage(6:8, 1)
 
+```
+```{r}
+ggplot(r_we_grp_fmt, aes(x = is_wrk, y = share_est, fill = has_dis)) +
+  geom_col(position = 'dodge') +
+  scale_y_continuous(labels = scales::percent_format()) +
+  geom_errorbar(aes(ymax = share_est + share_moe, ymin = share_est - share_moe),
+                position = position_dodge2(width = 1, padding = 0.5)) +
+  labs(y = NULL,
+       x = NULL) +
+  theme(legend.title = element_blank())
+
+  
 ```
 
 
@@ -281,3 +315,103 @@ datatable(r_we_dis_fmt) %>%
 
 ```
 
+```{r}
+ggplot(r_we_dis_fmt, aes(x = duration, y = share_est, fill = has_dis)) +
+  geom_col(position = 'dodge') +
+  scale_y_continuous(labels = scales::percent_format()) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) +
+  geom_errorbar(aes(ymax = share_est + share_moe, ymin = share_est - share_moe),
+                position = position_dodge2(width = 1, padding = 0.5)) +
+  labs(y = NULL,
+       x = NULL) +
+  theme(legend.title = element_blank())
+```
+
+# Disability Employment by Occupation (PUMS)
+```{r PUMS test, eval = FALSE, include = FALSE}
+x <- pums_vars_2021 %>% 
+  filter(str_detect(var_label, ".*[d|D]isability.*"))
+
+y <- pums_vars_2021 %>% 
+  filter(str_detect(var_label, ".*[w|W]orker.*"))
+```
+
+```{r PUMS, echo=FALSE}
+
+# COW (class of worker)
+# DIS (Disability recode)
+# https://psrc.github.io/psrccensus/articles/pums-1-basics.html
+# https://www.census.gov/topics/health/disability/guidance/data-collection-acs.html
+
+dis_wrkclass_pums <- get_psrc_pums(span = 1,                     # Denoting ACS 5-year estimates; 1-year also available
+                   dyear = 2021,                                 # Last data year of span
+                   level = "p",                                  # Unit of analysis == household ("p" used for person)
+                   vars = c("OCCP",                              # Occupation recode based on 2018 OCC codes
+                            # "COW",                             # Class of Worker
+                            "DIS"                                # Disability recode
+                            ))       
+
+```
+
+```{r, include = FALSE}
+
+occ_lu <- read.xlsx('occp.xlsx')
+
+dis_wrkclass_overview <- psrc_pums_count(dis_wrkclass_pums, group_vars = c("OCCP",  # Occupation recode based on 2018 OCC codes
+                                                                           # "COW", # Class of Worker
+                                                                           "DIS"    # Disability recode
+                                                                           )) 
+
+dis_wrkclass_overview02 <- dis_wrkclass_overview %>% 
+  separate(OCCP,
+           into = c("occp_abbr", "occp_desc"),
+           sep = "-")
+
+dis_wrkclass_overview03 <- dis_wrkclass_overview02 %>% 
+  filter(DIS != 'Total') %>% 
+  group_by(DATA_YEAR, COUNTY, occp_abbr, DIS) %>% 
+  summarise(count = sum(count), count_moe = moe_sum(estimate = count, moe = count_moe))
+
+dis_wrkclass_denom <- dis_wrkclass_overview02 %>% 
+  filter(occp_abbr == 'Total') %>% 
+  select(COUNTY, count_denom = count, moe_denom = count_moe)
+
+dis_wrkclass_overview04 <- dis_wrkclass_overview03 %>% 
+  left_join(dis_wrkclass_denom, by = 'COUNTY') %>% 
+  group_by(DATA_YEAR, COUNTY, occp_abbr, DIS) %>% 
+  summarise(count, count_moe, share = count/count_denom, share_moe = moe_prop(count, count_denom, count_moe, moe_denom)) %>% 
+  left_join(occ_lu, by = "occp_abbr")
+
+dis_wrkclass_overview_fmt <- dis_wrkclass_overview04 %>% 
+  select(DATA_YEAR, COUNTY, occp_abbr, definition, DIS, count, count_moe, share, share_moe)
+
+
+
+```
+
+Workers with disabilities work in various occupations
+
+- 6% of those in the region who have reported a disability did not report the sector they work in
+- The remainder of individuals who have reported a disability reported employment in various occupations. The top 3 occupations are:
+    - Office And Administrative Support Workers (.6%)
+    - Managerial roles (.5%)
+    - Sales And Related Workers (.5%)
+
+**Disability status by Occupation (with disability only)**
+```{r}
+dis_wrkclass_overview_fmt_disonly <- dis_wrkclass_overview_fmt %>% 
+  filter(DIS == 'With a disability')
+
+datatable(dis_wrkclass_overview_fmt_disonly) %>%
+  formatRound(columns=c('count'), digits = 0) %>% 
+  formatRound(columns=c('count_moe'), digits = 2) %>% 
+  formatPercentage(8:9, 1)
+
+```
+**Detailed Disability Status by Occupation**
+```{r}
+datatable(dis_wrkclass_overview_fmt) %>%
+  formatRound(columns=c('count'), digits = 0) %>% 
+  formatRound(columns=c('count_moe'), digits = 2) %>% 
+  formatPercentage(8:9, 1)
+```
