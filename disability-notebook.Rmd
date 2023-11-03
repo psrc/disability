@@ -3,6 +3,8 @@ title: "Disability Employment"
 output:
   html_notebook:
     code_folding: hide
+    toc: TRUE
+    toc_float: TRUE
     
 ---
 
@@ -12,15 +14,22 @@ body {
 }
 ```
 
-Disability Employment Awareness
+**Disability Employment Awareness Data Sources**
 
-B18120 Employment Status by Disability Status and Type (Civilian Noninstitutionalized Population 18 to 64 Years)
+- B18120 Employment Status by Disability Status and Type (Civilian Noninstitutionalized Population 18 to 64 Years)
 <!-- B18121 Work Experience by Disability Status and Type -->
 <!-- B18130 Age by Disability Status by Poverty Status -->
 
+- 2021 1 year PUMS variables: 
+  - DIS (disability flag)
+  - OCCP (Occupation recode based on 2018 OCC codes)
+  - LUM_JOBSECTOR (Modeling Sectors)
+
+**Information**
+
 [Census Stats](https://www.census.gov/newsroom/stories/disability-employment-awareness-month.html)
 
-The charts include the coefficient of variation (CV) measures which is the relative amount of sampling error that is associated with a sample estimate. See [this article](https://psrc.github.io/psrccensus/articles/calculate-reliability-moe-transformed-acs.html) for interpretation.
+The tables include the coefficient of variation (CV) measures which is the relative amount of sampling error that is associated with a sample estimate. See [this article](https://psrc.github.io/psrccensus/articles/calculate-reliability-moe-transformed-acs.html) for interpretation.
 
 ```{r, echo = FALSE}
 library(psrccensus)
@@ -54,7 +63,7 @@ r <- x02 %>%
   filter(name == 'Region')
 ```
 
-## Disability in Region (as a whole)
+# Disability in Region (as a whole)
 
 ```{r region with disability, echo = FALSE}
 w_dis <- c('04', '13', '22')
@@ -62,7 +71,7 @@ wo_dis <- c('11', '20', '29')
 
 r_tot <- r %>% 
   filter(variable_sort == '01') %>% 
-  select(name, denom_est = estimate, denom_moe = moe)
+  select(acs_type, year, name, denom_est = estimate, denom_moe = moe)
 
 r_dis <- r %>%
   filter(variable_sort %in% c(w_dis, wo_dis)) %>% 
@@ -76,18 +85,19 @@ r_dis <- r %>%
          share_moe = moe_prop(estimate, denom_est, moe, denom_moe))
 
 r_dis_fmt <- r_dis %>% 
-  select(-se, -denom_est, -denom_moe)
+  select(-se, -denom_est, -denom_moe) %>% 
+  relocate(any_of(c("acs_type", "year")), .before = name)
 
-datatable(r_dis_fmt)%>%
+datatable(r_dis_fmt) %>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
   formatRound(columns=c('moe', 'cv'), digits = 2) %>% 
-  formatPercentage(c(5, 6,7), 1)
+  formatPercentage(c('cv', 'share_est', 'share_moe'), 1)
   
 ```
 
 - 9.7% of people in the Central Puget Sound Region between the ages of 18-64 report having a disability 
 
-### Disability types
+## Disability types
 
 ```{r region disability types, echo = FALSE}
 
@@ -102,7 +112,7 @@ r_dis_type_denom <- r %>%
 r_dis_type <- r %>% 
   filter(has_dis == 'With a disability') %>% 
   filter(!(variable_sort %in% c('04', '13', '22'))) %>% # 444,261 
-  group_by(name, dis_type) %>%
+  group_by(acs_type, year, name, dis_type) %>%
   summarise(estimate = sum(estimate),
             moe = moe_sum(moe = moe, estimate = estimate)) %>% 
   mutate(se = moe/1.645) %>% 
@@ -117,7 +127,7 @@ r_dis_type_fmt <- r_dis_type %>%
 datatable(r_dis_type_fmt)%>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
   formatRound(columns=c('moe'), digits = 2) %>% 
-  formatPercentage(c(5, 6,7), 1)
+  formatPercentage(c('cv', 'share_est', 'share_moe'), 1)
 
 ```
 
@@ -130,7 +140,7 @@ ggplot(r_dis_type_fmt, aes(dis_type, share_est, fill = dis_type)) +
   geom_col(position = 'dodge') +
   scale_y_continuous(labels = scales::percent_format()) +
   scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) +
-  geom_errorbar(aes(ymax = share_est + share_moe, ymin = share_est - share_moe),
+  geom_linerange(aes(ymax = share_est + share_moe, ymin = share_est - share_moe),
                 position = position_dodge2(width = 0, padding = 0.5)) +
   labs(y = NULL,
        x = NULL) +
@@ -138,7 +148,7 @@ ggplot(r_dis_type_fmt, aes(dis_type, share_est, fill = dis_type)) +
         legend.position = "none")
 ```
 
-## Within the Labor Force
+# Within the Labor Force
 
 
 ```{r in labor force with disability}
@@ -167,12 +177,12 @@ r_lf_emp_dis <- r %>%
          share_moe_inlf = moe_prop(estimate, denom_in_lf_estimate, moe, denom_in_lf_moe))
   
 r_lf_emp_dis_fmt <- r_lf_emp_dis %>% 
-  select(name, in_lf, is_emp, has_dis, estimate, moe, cv, starts_with('share'))
+  select(acs_type, year, name, in_lf, is_emp, has_dis, estimate, moe, cv, starts_with('share'))
 
 datatable(r_lf_emp_dis_fmt) %>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
   formatRound(columns=c('moe'), digits = 2) %>% 
-  formatPercentage(7:11, 1)
+  formatPercentage(9:13, 1)
 
 
 ```
@@ -182,7 +192,7 @@ Of those in the labor force
 - 6.3% (approx 139,000 persons) with a disability are employed
 - Individuals with a disability and unemployed represent 0.6% (12,700 persons) of the labor force
 
-## Not in the Labor Force
+# Not in the Labor Force
 ```{r not in labor force with disability}
 # NOT in labor force, with a disability
 
@@ -209,12 +219,12 @@ r_not_lf_dis <- r %>%
          share_moe_inlf = moe_prop(estimate, denom_in_lf_estimate, moe, denom_in_lf_moe))
   
 r_not_lf_dis_fmt <- r_not_lf_dis %>% 
-  select(name, in_lf, is_emp, has_dis, estimate, moe, cv, starts_with('share'))
+  select(acs_type, year, name, in_lf, is_emp, has_dis, estimate, moe, cv, starts_with('share'))
 
 datatable(r_not_lf_dis_fmt) %>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
   formatRound(columns=c('moe'), digits = 2) %>% 
-  formatPercentage(7:11, 1)
+  formatPercentage(9:13, 1)
 
 
 ```
@@ -223,7 +233,7 @@ datatable(r_not_lf_dis_fmt) %>%
 
 - Of those not in the labor force, 21.8% percent report a disability 
 
-## Work Experience by Disability Status and Type
+# Work Experience by Disability Status and Type
 
 ```{r B18121 Work Experience by Disability Status and Type, echo = FALSE}
 we <- get_acs_recs('county', table.names = 'B18121', years = '2022', acs.type = 'acs1')
@@ -256,7 +266,7 @@ r_we_denom <- r_we %>%
 r_we_grp <- r_we %>% 
   filter(!(variable_sort %in% exc_we_rows)) %>% 
   mutate(is_wrk = ifelse(str_detect(duration, "Worked.*"), "Worked", "Not Worked")) %>% 
-  group_by(name, is_wrk, has_dis) %>% 
+  group_by(acs_type, year, name, is_wrk, has_dis) %>% 
   summarise(estimate = sum(estimate),
             moe = moe_sum(moe = moe, estimate = estimate)) %>% 
   mutate(se = moe/1.645) %>% 
@@ -266,19 +276,19 @@ r_we_grp <- r_we %>%
          share_moe = moe_prop(estimate, denom_est, moe, denom_moe))
 
 r_we_grp_fmt <- r_we_grp %>% 
-  select(name, is_wrk, has_dis, estimate, moe, cv, starts_with('share'))
+  select(acs_type, year, name, is_wrk, has_dis, estimate, moe, cv, starts_with('share'))
 
 datatable(r_we_grp_fmt) %>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
   formatRound(columns=c('moe'), digits = 2) %>% 
-  formatPercentage(6:8, 1)
+  formatPercentage(c('cv', 'share_est', 'share_moe'), 1)
 
 ```
 ```{r}
 ggplot(r_we_grp_fmt, aes(x = is_wrk, y = share_est, fill = has_dis)) +
   geom_col(position = 'dodge') +
   scale_y_continuous(labels = scales::percent_format()) +
-  geom_errorbar(aes(ymax = share_est + share_moe, ymin = share_est - share_moe),
+  geom_linerange(aes(ymax = share_est + share_moe, ymin = share_est - share_moe),
                 position = position_dodge2(width = 1, padding = 0.5)) +
   labs(y = NULL,
        x = NULL) +
@@ -296,7 +306,7 @@ ggplot(r_we_grp_fmt, aes(x = is_wrk, y = share_est, fill = has_dis)) +
 
 r_we_dis <- r_we %>% 
   filter(!(variable_sort %in% exc_we_rows)) %>% 
-  group_by(name, duration, has_dis) %>% 
+  group_by(acs_type, year, name, duration, has_dis) %>% 
   summarise(estimate = sum(estimate),
             moe = moe_sum(moe = moe, estimate = estimate)) %>%
   mutate(se = moe/1.645) %>% 
@@ -306,12 +316,12 @@ r_we_dis <- r_we %>%
          share_moe = moe_prop(estimate, denom_est, moe, denom_moe))
 
 r_we_dis_fmt <- r_we_dis %>% 
-  select(name, duration, has_dis, estimate, moe, cv, starts_with('share'))
+  select(acs_type, year, name, duration, has_dis, estimate, moe, cv, starts_with('share'))
 
 datatable(r_we_dis_fmt) %>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
   formatRound(columns=c('moe'), digits = 2) %>% 
-  formatPercentage(6:8, 1)
+  formatPercentage(c('cv', 'share_est', 'share_moe'), 1)
 
 ```
 
@@ -320,7 +330,7 @@ ggplot(r_we_dis_fmt, aes(x = duration, y = share_est, fill = has_dis)) +
   geom_col(position = 'dodge') +
   scale_y_continuous(labels = scales::percent_format()) +
   scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) +
-  geom_errorbar(aes(ymax = share_est + share_moe, ymin = share_est - share_moe),
+  geom_linerange(aes(ymax = share_est + share_moe, ymin = share_est - share_moe),
                 position = position_dodge2(width = 1, padding = 0.5)) +
   labs(y = NULL,
        x = NULL) +
@@ -334,9 +344,15 @@ x <- pums_vars_2021 %>%
 
 y <- pums_vars_2021 %>% 
   filter(str_detect(var_label, ".*[w|W]orker.*"))
+
+pums_varsearch(".*[d|D]isability.*")
+pums_varsearch("OCCP")
+pums_varsearch("LUM_JOBSECTOR")
+
+
 ```
 
-```{r PUMS, echo=FALSE}
+```{r PUMS Occp, echo=FALSE}
 
 # COW (class of worker)
 # DIS (Disability recode)
@@ -370,7 +386,9 @@ dis_wrkclass_overview02 <- dis_wrkclass_overview %>%
 dis_wrkclass_overview03 <- dis_wrkclass_overview02 %>% 
   filter(DIS != 'Total') %>% 
   group_by(DATA_YEAR, COUNTY, occp_abbr, DIS) %>% 
-  summarise(count = sum(count), count_moe = moe_sum(estimate = count, moe = count_moe))
+  summarise(count = sum(count), count_moe = moe_sum(estimate = count, moe = count_moe)) %>% 
+  mutate(se = count_moe/1.645) %>% 
+  mutate(cv = (se/count))
 
 dis_wrkclass_denom <- dis_wrkclass_overview02 %>% 
   filter(occp_abbr == 'Total') %>% 
@@ -379,11 +397,11 @@ dis_wrkclass_denom <- dis_wrkclass_overview02 %>%
 dis_wrkclass_overview04 <- dis_wrkclass_overview03 %>% 
   left_join(dis_wrkclass_denom, by = 'COUNTY') %>% 
   group_by(DATA_YEAR, COUNTY, occp_abbr, DIS) %>% 
-  summarise(count, count_moe, share = count/count_denom, share_moe = moe_prop(count, count_denom, count_moe, moe_denom)) %>% 
+  summarise(count, count_moe, cv, share = count/count_denom, share_moe = moe_prop(count, count_denom, count_moe, moe_denom)) %>% 
   left_join(occ_lu, by = "occp_abbr")
 
 dis_wrkclass_overview_fmt <- dis_wrkclass_overview04 %>% 
-  select(DATA_YEAR, COUNTY, occp_abbr, definition, DIS, count, count_moe, share, share_moe)
+  select(DATA_YEAR, COUNTY, occp_abbr, definition, DIS, count, count_moe, cv, share, share_moe)
 
 
 
@@ -415,3 +433,75 @@ datatable(dis_wrkclass_overview_fmt) %>%
   formatRound(columns=c('count_moe'), digits = 2) %>% 
   formatPercentage(8:9, 1)
 ```
+
+# Disability Employment by Job Sectors (PUMS) 
+
+## PSRC Land Use Modeling Job Sectors
+```{r PUMS model job sectors}
+dis_modsect_pums <- get_psrc_pums(span = 1,                                     # Denoting ACS 5-year estimates; 1-year also available
+                                  dyear = 2021,                                 # Last data year of span
+                                  level = "p",                                  # Unit of analysis == household ("p" used for person)
+                                  vars = c("LUM_JOBSECTOR",                              # Modeling Sectors
+                                          "DIS"                                 # Disability recode
+                                           ))   
+
+dis_modsect_overview <- psrc_pums_count(dis_modsect_pums, 
+                                        group_vars = c("LUM_JOBSECTOR",         # Modeling Sectors
+                                                       "DIS"                    # Disability recode
+                                                      )) 
+
+dis_modsect_overview02 <- dis_modsect_overview %>%
+  filter(DIS != 'Total') %>%
+  group_by(DATA_YEAR, COUNTY, LUM_JOBSECTOR, DIS) %>%
+  summarise(count = sum(count), count_moe = moe_sum(estimate = count, moe = count_moe)) %>%
+  mutate(se = count_moe/1.645) %>% 
+  mutate(cv = (se/count)) 
+
+dis_modsect_denom <- dis_modsect_overview %>%
+  filter(LUM_JOBSECTOR == 'Total') %>%
+  select(COUNTY, count_denom = count, moe_denom = count_moe)
+
+dis_modsect_overview03 <- dis_modsect_overview02 %>%
+  left_join(dis_modsect_denom, by = 'COUNTY') %>%
+  group_by(DATA_YEAR, COUNTY, LUM_JOBSECTOR, DIS) %>%
+  summarise(count, count_moe, cv, share = count/count_denom, share_moe = moe_prop(count, count_denom, count_moe, moe_denom))
+
+dis_modsect_overview_fmt <- dis_modsect_overview03 %>%
+  select(DATA_YEAR, COUNTY, LUM_JOBSECTOR, DIS, count, count_moe, cv,share, share_moe)
+
+```
+
+**Detailed Disability Status by Modeling Sectors**
+```{r}
+datatable(dis_modsect_overview_fmt) %>%
+  formatRound(columns=c('count'), digits = 0) %>% 
+  formatRound(columns=c('count_moe'), digits = 2) %>% 
+  formatPercentage(7:9, 1)
+```
+
+
+```{r}
+dis_modsect_overview_fmt_plot <- dis_modsect_overview_fmt %>% 
+  mutate(sector = str_extract(LUM_JOBSECTOR, "(?<=-).*")) %>% 
+  filter(!is.na(LUM_JOBSECTOR) & DIS == 'With a disability') # a lot of NAs for sector, focus only on disability emp
+
+ggplot(dis_modsect_overview_fmt_plot, aes(x = reorder(sector, -share), y = share)) +
+  geom_col(position = 'dodge') +
+  scale_y_continuous(labels = scales::percent_format()) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) +
+  geom_linerange(aes(ymax = share + share_moe, ymin = share - share_moe),
+                position = position_dodge2(width = 1, padding = 0.5)) +
+  labs(y = NULL,
+       x = NULL,
+       title = 'Workers with Disabilities by Job Sector',
+       caption = 'Based on sectors used for land use modeling') +
+  theme(legend.title = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=.5))
+```
+Workers with Disabilities by Job Sector
+
+- 6.5% of the region's population report a disability but not the sector they work in
+- 1% of the region's population are workers in Business Services who reported a disability while 0.7% work in Retail, 0.6% in Healthcare, and 0.5% in Manufacturing
+- The sectors listed are used for PSRC's land use modeling
+
