@@ -497,7 +497,15 @@ Workers with Disabilities by Job Sector
 ## PSRC Covered Employment Job Sectors 
 ```{r PUMS Covered Employment job sectors}
 
-# create function
+dis_covemp_2020 <- create_covempsect_pums_table(span = 5, dyear = 2020)
+dis_covemp_2021 <- create_covempsect_pums_table(span = 1, dyear = 2021)
 
+dis_covemp_fmt <- bind_rows(dis_covemp_2021, dis_covemp_2020)
 ```
 
+```{r}
+datatable(dis_covemp_fmt) %>%
+  formatRound(columns=c('count'), digits = 0) %>% 
+  formatRound(columns=c('count_moe'), digits = 2) %>% 
+  formatPercentage(7:9, 1)
+```
