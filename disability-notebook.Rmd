@@ -16,7 +16,7 @@ body {
 
 **Disability Employment Awareness Data Sources**
 
-- B18120 Employment Status by Disability Status and Type (Civilian Noninstitutionalized Population 18 to 64 Years)
+- 2022 ACS 5-year B18120 Employment Status by Disability Status and Type (Civilian Noninstitutionalized Population 18 to 64 Years)
 <!-- B18121 Work Experience by Disability Status and Type -->
 <!-- B18130 Age by Disability Status by Poverty Status -->
 
@@ -38,6 +38,8 @@ library(tidyverse)
 library(tidycensus)
 library(DT)
 library(openxlsx)
+
+source('functions.R')
 ```
 
 ```{r B18120 Employment Status, echo = FALSE}
@@ -438,36 +440,16 @@ datatable(dis_wrkclass_overview_fmt) %>%
 
 ## PSRC Land Use Modeling Job Sectors
 ```{r PUMS model job sectors}
-dis_modsect_pums <- get_psrc_pums(span = 1,                                     # Denoting ACS 5-year estimates; 1-year also available
-                                  dyear = 2021,                                 # Last data year of span
-                                  level = "p",                                  # Unit of analysis == household ("p" used for person)
-                                  vars = c("LUM_JOBSECTOR",                              # Modeling Sectors
-                                          "DIS"                                 # Disability recode
-                                           ))   
 
-dis_modsect_overview <- psrc_pums_count(dis_modsect_pums, 
-                                        group_vars = c("LUM_JOBSECTOR",         # Modeling Sectors
-                                                       "DIS"                    # Disability recode
-                                                      )) 
+dis_modsect_overview_fmt_2021 <- create_modsect_pums_table(span = 1, dyear = 2021)
+dis_modsect_overview_fmt_2020 <- create_modsect_pums_table(span = 5, dyear = 2020)
 
-dis_modsect_overview02 <- dis_modsect_overview %>%
-  filter(DIS != 'Total') %>%
-  group_by(DATA_YEAR, COUNTY, LUM_JOBSECTOR, DIS) %>%
-  summarise(count = sum(count), count_moe = moe_sum(estimate = count, moe = count_moe)) %>%
-  mutate(se = count_moe/1.645) %>% 
-  mutate(cv = (se/count)) 
+dis_modsect_overview_fmt <- bind_rows(dis_modsect_overview_fmt_2021, dis_modsect_overview_fmt_2020)
 
-dis_modsect_denom <- dis_modsect_overview %>%
-  filter(LUM_JOBSECTOR == 'Total') %>%
-  select(COUNTY, count_denom = count, moe_denom = count_moe)
+```
 
-dis_modsect_overview03 <- dis_modsect_overview02 %>%
-  left_join(dis_modsect_denom, by = 'COUNTY') %>%
-  group_by(DATA_YEAR, COUNTY, LUM_JOBSECTOR, DIS) %>%
-  summarise(count, count_moe, cv, share = count/count_denom, share_moe = moe_prop(count, count_denom, count_moe, moe_denom))
-
-dis_modsect_overview_fmt <- dis_modsect_overview03 %>%
-  select(DATA_YEAR, COUNTY, LUM_JOBSECTOR, DIS, count, count_moe, cv,share, share_moe)
+```{r export data}
+# export as xlsx
 
 ```
 
@@ -483,9 +465,10 @@ datatable(dis_modsect_overview_fmt) %>%
 ```{r}
 dis_modsect_overview_fmt_plot <- dis_modsect_overview_fmt %>% 
   mutate(sector = str_extract(LUM_JOBSECTOR, "(?<=-).*")) %>% 
+  mutate(DATA_YEAR = factor(DATA_YEAR, levels = c('2020', '2021'))) %>% 
   filter(!is.na(LUM_JOBSECTOR) & DIS == 'With a disability') # a lot of NAs for sector, focus only on disability emp
 
-ggplot(dis_modsect_overview_fmt_plot, aes(x = reorder(sector, -share), y = share)) +
+ggplot(dis_modsect_overview_fmt_plot, aes(x = sector, y = share, fill = DATA_YEAR)) +
   geom_col(position = 'dodge') +
   scale_y_continuous(labels = scales::percent_format()) +
   scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) +
@@ -498,10 +481,23 @@ ggplot(dis_modsect_overview_fmt_plot, aes(x = reorder(sector, -share), y = share
   theme(legend.title = element_blank(),
         axis.ticks.x = element_blank(),
         axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=.5))
+
 ```
 Workers with Disabilities by Job Sector
+
+**2020**
+
+
+**2021**
 
 - 6.5% of the region's population report a disability but not the sector they work in
 - 1% of the region's population are workers in Business Services who reported a disability while 0.7% work in Retail, 0.6% in Healthcare, and 0.5% in Manufacturing
 - The sectors listed are used for PSRC's land use modeling
+
+## PSRC Covered Employment Job Sectors 
+```{r PUMS Covered Employment job sectors}
+
+# create function
+
+```
 
