@@ -61,7 +61,7 @@ create_covempsect_pums_table <- function(span, dyear) {
                         group_vars = c("STANDARD_JOBSECTOR",       
                                        "DIS"                  
                         )) %>% 
-    mutate(acs_type = "acs5")
+    mutate(acs_type = paste0('acs', span))
 
   denom <- df %>% 
     filter(STANDARD_JOBSECTOR == 'Total') %>%

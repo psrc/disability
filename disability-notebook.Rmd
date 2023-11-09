@@ -16,14 +16,15 @@ body {
 
 **Disability Employment Awareness Data Sources**
 
-- 2022 ACS 5-year B18120 Employment Status by Disability Status and Type (Civilian Noninstitutionalized Population 18 to 64 Years)
+- 2022 ACS 5-year B18120 Employment Status by Disability Status and Type (Civilian Non-institutionalized Population 18 to 64 Years)
 <!-- B18121 Work Experience by Disability Status and Type -->
 <!-- B18130 Age by Disability Status by Poverty Status -->
 
-- 2021 1 year PUMS variables: 
+- 2020 5-year ACS PUMS variables or 2021 1-year ACS PUMS variables 
   - DIS (disability flag)
   - OCCP (Occupation recode based on 2018 OCC codes)
   - LUM_JOBSECTOR (Modeling Sectors)
+  - STANDARD_JOBSECTOR (Covered Employment Sectors)
 
 **Information**
 
@@ -40,6 +41,8 @@ library(DT)
 library(openxlsx)
 
 source('functions.R')
+
+outdir <- "T:\\2023November\\Christy\\disability_emp"
 ```
 
 ```{r B18120 Employment Status, echo = FALSE}
@@ -468,7 +471,7 @@ dis_modsect_overview_fmt_plot <- dis_modsect_overview_fmt %>%
   mutate(DATA_YEAR = factor(DATA_YEAR, levels = c('2020', '2021'))) %>% 
   filter(!is.na(LUM_JOBSECTOR) & DIS == 'With a disability') # a lot of NAs for sector, focus only on disability emp
 
-ggplot(dis_modsect_overview_fmt_plot, aes(x = sector, y = share, fill = DATA_YEAR)) +
+ggplot(dis_modsect_overview_fmt_plot, aes(x = reorder(sector, -share), y = share, fill = DATA_YEAR)) +
   geom_col(position = 'dodge') +
   scale_y_continuous(labels = scales::percent_format()) +
   scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) +
@@ -503,9 +506,46 @@ dis_covemp_2021 <- create_covempsect_pums_table(span = 1, dyear = 2021)
 dis_covemp_fmt <- bind_rows(dis_covemp_2021, dis_covemp_2020)
 ```
 
+```{r export to xlsx, eval=FALSE}
+
+write.xlsx(dis_covemp_fmt, file.path(outdir, "disability_covemp_pums_2020_2021.xlsx"))
+```
+
 ```{r}
 datatable(dis_covemp_fmt) %>%
   formatRound(columns=c('count'), digits = 0) %>% 
   formatRound(columns=c('count_moe'), digits = 2) %>% 
-  formatPercentage(7:9, 1)
+  formatPercentage(8:10, 1)
 ```
+```{r}
+dis_covemp_fmt_plot <- dis_covemp_fmt %>% 
+  mutate(sector = str_extract(STANDARD_JOBSECTOR, "(?<=-).*")) %>% 
+  mutate(DATA_YEAR = factor(DATA_YEAR, levels = c('2020', '2021'))) %>% 
+  filter(!is.na(STANDARD_JOBSECTOR) & DIS == 'With a disability') # a lot of NAs for sector, focus only on disability emp
+
+ggplot(dis_covemp_fmt_plot, aes(x = reorder(sector, -share), y = share, fill = DATA_YEAR)) +
+  geom_col(position = 'dodge') +
+  scale_y_continuous(labels = scales::percent_format()) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) +
+  geom_linerange(aes(ymax = share + share_moe, ymin = share - share_moe),
+                position = position_dodge2(width = 1, padding = 0.5)) +
+  labs(y = NULL,
+       x = NULL,
+       title = 'Workers with Disabilities by Covered Employment Job Sectors',
+       caption = 'Source: 2020 5-year ACS PUMS, 2021 1-year ACS PUMS.'
+       ) +
+  theme(legend.title = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=.5))
+
+```
+
+Workers with Disabilities by Covered Employment Sector
+
+**2020**
+
+
+**2021**
+
+- In both 2020 and 2021, about 2% of the region's population report a disability while working in the Services sector.
+- About .5% of the region's population report a disability and work in the Retail or Manufacturing sector.
