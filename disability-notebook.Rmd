@@ -456,7 +456,7 @@ dis_modsect_overview_fmt <- bind_rows(dis_modsect_overview_fmt_2019, dis_modsect
 
 ```
 
-```{r export data}
+```{r export data, eval = FALSE}
 # export as xlsx
 write.xlsx(dis_modsect_overview_fmt, file.path(outdir, "disability_landusemod_pums_2019-2022.xlsx"))
 
@@ -492,7 +492,7 @@ ggplot(dis_modsect_overview_fmt_plot, aes(x = reorder(sector, -share), y = share
         axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=.5))
 
 ```
-Workers with Disabilities by Job Sector
+Workers with Disabilities by Job Sector; the sectors listed are used for PSRC's land use modeling
 
 **2019**
 
@@ -500,13 +500,9 @@ Workers with Disabilities by Job Sector
 
 **2021**
 
-- 6.5% of the region's population report a disability but not the sector they work in
-- 1% of the region's population are workers in Business Services who reported a disability while 0.7% work in Retail, 0.6% in Healthcare, and 0.5% in Manufacturing
-- The sectors listed are used for PSRC's land use modeling
-
 **2022**
 
-- 1.1% of the region's population report a disability while working in Business Services
+
 
 ## PSRC Covered Employment Job Sectors 
 ```{r PUMS Covered Employment job sectors}
@@ -521,7 +517,7 @@ dis_covemp_fmt <- bind_rows(dis_covemp_2019, dis_covemp_2020, dis_covemp_2021, d
 
 ```{r export to xlsx, eval=FALSE}
 
-write.xlsx(dis_covemp_fmt, file.path(outdir, "disability_covemp_pums_2019-2022.xlsx"))
+write.xlsx(dis_covemp_fmt, file.path(outdir, paste0("disability_covemp_pums_2019-2022_updated_", Sys.Date(),".xlsx")))
 ```
 
 ```{r}
@@ -562,9 +558,9 @@ Workers with Disabilities by Covered Employment Sector
 
 **2021**
 
-- In both 2020 and 2021, about 2% of the region's population report a disability while working in the Services sector.
-- About .5% of the region's population report a disability and work in the Retail or Manufacturing sector.
+- About 2% of the region's population report a disability while working in the Services sector.
+
 
 **2022**
 
-- Increased workers with disabilities in Services and Public Education
+- Increased workers with disabilities in Retail and Public Education
