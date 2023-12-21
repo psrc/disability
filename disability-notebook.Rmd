@@ -679,7 +679,7 @@ datatable(m_earn) %>%
 ```
 
 # Charts
-```{r 2022 Labor Force by Disability Status}
+```{r 2022 Labor Force by Disability Status Data}
 # 1. Employment graph
 df_lf <- r_lf_emp_dis_fmt %>% 
   select(acs_type:moe)
@@ -696,6 +696,9 @@ df_lf_dis <- df_lf %>%
                               denom = denom,
                               moe_num = moe,
                               moe_denom = denom_moe))
+```
+
+```{r, eval=FALSE}
 
 # col <- ggplot(df_lf_dis) +
 #  geom_col(aes(x = has_dis, y = share, fill = is_emp),
@@ -761,6 +764,35 @@ e_p
 # webshot2::webshot('dis_status_by_emp_status_in_lf.html', file = 'dis_status_by_emp_status_in_lf_22.png')
 ```
 
+```{r, 2022 Labor Force by Disability Status Plot}
+
+df_lf_dis_unemp <- df_lf_dis %>% 
+  filter(is_emp == 'Unemployed')
+
+df_lf_dis_unemp_p <- static_column_chart(
+  t = df_lf_dis_unemp ,
+  y = "share",
+  x = "has_dis",
+  fill = "has_dis",
+  pos = "dodge",
+  xlabel = NULL,
+  ylabel = NULL, 
+  est = "percent",
+  title = "Percent Unemployed by Disability Status 2022",
+  subtitle = "",
+  source = "ACS 1-year 2022, B18120 Employment Status by Disability Status and Type \n (Civilian Non-institutionalized Population 18 to 64 Years)",
+  alt = NULL,
+) +
+  theme(plot.margin = margin(t = 1, r = 1, b = 1, l = 1, "cm"))
+
+df_lf_dis_unemp_p
+
+# jpeg(file=here::here("images/B18120_in_labor_force_22.jpeg"), height = 532, width = 800)
+# print(df_lf_dis_unemp_p)
+# dev.off()
+
+```
+
 ```{r  2022 CovEmp Sectors}
 # 3. Table ofwith dis in one col, no dis. of sectors by percentage employed
 dis_type <- unique(dis_covemp_2022$DIS)
@@ -793,7 +825,8 @@ df <- dcemp_22_2 %>%
                                             "Services",
                                             "Wholesale Trade, Transportation, \n and Utilities",
                                             "Government",
-                                            "Public Education")))
+                                            "Public Education"))) %>% 
+  mutate(DIS = ifelse(DIS == 'Without a disability', 'No disability', 'With a disability'))
 
 # write.xlsx(dcemp_22_2, "cov_emp_22_chart.xlsx")
 # df <- read.xlsx("cov_emp_22_chart.xlsx")
@@ -845,16 +878,18 @@ pov_df_aa <- p_df_aa %>%
   mutate(label = case_when(pov_level == 'Income in the past 12-months at or above poverty level' ~ 'Above Poverty Level',
                            pov_level == 'Income in the past 12-months below poverty level' ~ 'Below Poverty Level'))
 
+pdf <- pov_df_aa %>% filter(label == 'Below Poverty Level') %>% arrange(-share)
+
 pov_df_aa_p <- static_column_chart(
-  t = pov_df_aa ,
+  t = pdf,
   y = "share",
   x = "has_dis",
-  fill = "label",
-  pos = "stack",
+  fill = "has_dis",
+  pos = "dodge",
   xlabel = NULL,
   ylabel = NULL, 
   est = "percent",
-  title = "Disability Status by Poverty Level in 2022",
+  title = "Disability Status Below Poverty Level in 2022",
   subtitle = "Income in the past 12 months",
   source = "ACS 1-year 2022, C18130 Poverty Status by Disability Status and Age",
   alt = NULL,
