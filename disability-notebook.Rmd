@@ -4,33 +4,50 @@ output:
   html_notebook:
     code_folding: hide
     toc: TRUE
-    toc_float: TRUE
-    
+    toc_float: 
+      toc_collapsed: FALSE
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
 
 ```{css, echo = FALSE}
 body {
 font-family: Poppins;
 }
+options(scipen=999)
 ```
 
 **Disability Employment Awareness Data Sources**
 
-- 2022 ACS 1-year B18120 Employment Status by Disability Status and Type (Civilian Non-institutionalized Population 18 to 64 Years)
+<!-- - 2022 ACS 1-year B18120 Employment Status by Disability Status and Type (Civilian Non-institutionalized Population 18 to 64 Years) -->
+
 <!-- B18121 Work Experience by Disability Status and Type -->
+
 <!-- B18130 Age by Disability Status by Poverty Status -->
 
-- 2022 ACS 1-year B18121 Work Experience by Disability Status and Type
-- 2022 ACS 1-year C18130 Poverty Status by Disability Status and Age
+<!-- - 2022 ACS 1-year B18121 Work Experience by Disability Status and Type -->
+
+<!-- - 2022 ACS 1-year C18130 Poverty Status by Disability Status and Age -->
+
+-   2023 ACS 1-year B18120 Employment Status by Disability Status and Type (Civilian Non-institutionalized Population 18 to 64 Years)
+-   2023 ACS 1-year B18121 Work Experience by Disability Status and Type
+-   2023 ACS 1-year C18130 Poverty Status by Disability Status and Age
 
 *ACS PUMS Variables*
 
-- 2019 1-year, 2020 5-year, 2021 1-year, 2022 1-year
+**2023 1-year PUMS Not Available Until Oct 17, 2024**
 
-- DIS (disability flag)
-- OCCP (Occupation recode based on 2018 OCC codes)
-- LUM_JOBSECTOR (Modeling Sectors)
-- STANDARD_JOBSECTOR (Covered Employment Sectors)
+-   2019 1-year, 2020 5-year, 2021 1-year, 2022 1-year
+
+-   DIS (disability flag)
+
+-   OCCP (Occupation recode based on 2018 OCC codes)
+
+-   LUM_JOBSECTOR (Modeling Sectors)
+
+-   STANDARD_JOBSECTOR (Covered Employment Sectors)
 
 **Information**
 
@@ -38,7 +55,7 @@ font-family: Poppins;
 
 The tables include the coefficient of variation (CV) measures which is the relative amount of sampling error that is associated with a sample estimate. See [this article](https://psrc.github.io/psrccensus/articles/calculate-reliability-moe-transformed-acs.html) for interpretation.
 
-```{r, echo = FALSE}
+```{r, warning=FALSE, echo=FALSE}
 library(psrccensus)
 library(psrcplot)
 library(tidyverse)
@@ -49,11 +66,12 @@ library(echarts4r)
 
 source('functions.R')
 
-outdir <- "T:\\2023December\\Christy\\disability_emp"
+outdir <- "T:\\2024September\\Christy\\disability_emp"
+acs_year <- 2023
 ```
 
-```{r B18120 Employment Status, echo = FALSE}
-x <- get_acs_recs('county', table.names = 'B18120', years = '2022', acs.type = 'acs1')
+```{r B18120 Employment Status, echo=FALSE}
+x <- get_acs_recs('county', table.names = 'B18120', years = acs_year, acs.type = 'acs1')
 
 x02 <- x %>% 
   mutate(variable_sort = str_extract(variable, "\\d{2}$")) %>% 
@@ -100,14 +118,23 @@ r_dis_fmt <- r_dis %>%
   select(-se, -denom_est, -denom_moe) %>% 
   relocate(any_of(c("acs_type", "year")), .before = name)
 
-datatable(r_dis_fmt) %>%
+datatable(r_dis_fmt,
+          options = list(dom = 'ip' # default is 'lftipr', exclude f to remove search bar 
+                         )
+          ) %>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
   formatRound(columns=c('moe', 'cv'), digits = 2) %>% 
   formatPercentage(c('cv', 'share_est', 'share_moe'), 1)
 
 ```
 
-- 9.7% of people in the Central Puget Sound Region between the ages of 18-64 report having a disability 
+```{r, include=FALSE}
+
+r_dis_fmt_text <- r_dis_fmt |> 
+  filter(has_dis == 'With a disability')
+```
+
+-   In `r r_dis_fmt_text$year` (`r r_dis_fmt_text$acs_type`) `r round(r_dis_fmt_text$share_est * 100, 2)`% of people in the Central Puget Sound Region between the ages of 18-64 report having a disability
 
 ## Disability types
 
@@ -136,32 +163,53 @@ r_dis_type <- r %>%
 r_dis_type_fmt <- r_dis_type %>% 
   select(-se, -denom_est, -denom_moe)
 
-datatable(r_dis_type_fmt)%>%
+datatable(r_dis_type_fmt,
+          options = list(dom = 'ip' # default is 'lftipr', exclude f to remove search bar 
+                         )
+          )%>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
   formatRound(columns=c('moe'), digits = 2) %>% 
   formatPercentage(c('cv', 'share_est', 'share_moe'), 1)
 
 ```
 
-* Individuals can report more than one disability. Aggregating all disability types will not equal the reported 'With a disability' totals.
+-   Individuals can report more than one disability. Aggregating all disability types will not equal the reported 'With a disability' totals.
 
-- Most individuals in the region with a disability report at least a cognitive difficulty followed by independent living difficulty, and an ambulatory difficulty
+-   Most individuals in the region with a disability report at least a cognitive difficulty followed by independent living difficulty, and an ambulatory difficulty
 
-```{r}
-ggplot(r_dis_type_fmt, aes(dis_type, share_est, fill = dis_type)) +
-  geom_col(position = 'dodge') +
-  scale_y_continuous(labels = scales::percent_format()) +
-  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) +
-  geom_linerange(aes(ymax = share_est + share_moe, ymin = share_est - share_moe),
-                 position = position_dodge2(width = 0, padding = 0.5)) +
-  labs(y = NULL,
-       x = NULL) +
-  theme(legend.title = element_blank(),
-        legend.position = "none")
+```{r Disability Types Chart}
+# ggplot(r_dis_type_fmt, aes(dis_type, share_est, fill = dis_type)) +
+#   geom_col(position = 'dodge') +
+#   scale_y_continuous(labels = scales::percent_format()) +
+#   scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) +
+#   geom_linerange(aes(ymax = share_est + share_moe, ymin = share_est - share_moe),
+#                  position = position_dodge2(width = 0, padding = 0.5)) +
+#   labs(y = NULL,
+#        x = NULL) +
+#   theme(legend.title = element_blank(),
+#         legend.position = "none")
+
+static_column_chart(
+  t = r_dis_type_fmt,
+  y = "share_est",
+  x = "dis_type",
+  fill = "dis_type",
+  pos = "dodge",
+  xlabel = NULL,
+  ylabel = NULL, 
+  moe = "share_moe",
+  est = "percent",
+  title = "Disability Types",
+  # subtitle = "Income in the past 12 months",
+  source = paste("ACS 1-year", acs_year),
+  alt = NULL,
+) +
+  theme(plot.margin = margin(t = 1, r = 1, b = 1, l = 1, "cm")) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10))
+  
 ```
 
 ## Within the Labor Force
-
 
 ```{r in labor force with disability}
 # in labor force, emp/ump, with a disability
@@ -191,7 +239,10 @@ r_lf_emp_dis <- r %>%
 r_lf_emp_dis_fmt <- r_lf_emp_dis %>% 
   select(acs_type, year, name, in_lf, is_emp, has_dis, estimate, moe, cv, starts_with('share'))
 
-datatable(r_lf_emp_dis_fmt) %>%
+datatable(r_lf_emp_dis_fmt,
+          options = list(dom = 'ip' # default is 'lftipr', exclude f to remove search bar 
+                         )
+          ) %>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
   formatRound(columns=c('moe'), digits = 2) %>% 
   formatPercentage(9:13, 1)
@@ -199,12 +250,23 @@ datatable(r_lf_emp_dis_fmt) %>%
 
 ```
 
+```{r, include=FALSE}
+r_lf_emp_dis_fmt_text_dis_emp <- r_lf_emp_dis_fmt |> 
+  filter(is_emp == 'Employed', has_dis == 'With a disability')
+
+r_lf_emp_dis_fmt_text_dis_unemp <- r_lf_emp_dis_fmt |> 
+  filter(is_emp == 'Unemployed', has_dis == 'With a disability')
+
+```
+
 Of those in the labor force
 
-- 6.3% (approx 139,000 persons) with a disability are employed
-- Individuals with a disability and unemployed represent 0.6% (12,700 persons) of the labor force
+-   In `r r_lf_emp_dis_fmt_text_dis_emp$year` (`r r_lf_emp_dis_fmt_text_dis_emp$acs_type`) `r round(r_lf_emp_dis_fmt_text_dis_emp$share_est_inlf * 100, 1)`% (`r r_lf_emp_dis_fmt_text_dis_emp$estimate` persons) with a disability are employed
+
+-   In `r r_lf_emp_dis_fmt_text_dis_unemp$year` (`r r_lf_emp_dis_fmt_text_dis_unemp$acs_type`), individuals with a disability and unemployed represent `r round(r_lf_emp_dis_fmt_text_dis_unemp$share_est_inlf * 100, 2)`% (`r r_lf_emp_dis_fmt_text_dis_unemp$estimate` persons) of the labor force
 
 ## Not in the Labor Force
+
 ```{r not in labor force with disability}
 # NOT in labor force, with a disability
 
@@ -233,7 +295,9 @@ r_not_lf_dis <- r %>%
 r_not_lf_dis_fmt <- r_not_lf_dis %>% 
   select(acs_type, year, name, in_lf, is_emp, has_dis, estimate, moe, cv, starts_with('share'))
 
-datatable(r_not_lf_dis_fmt) %>%
+datatable(r_not_lf_dis_fmt,
+          options = list(dom = 'ip' # default is 'lftipr', exclude f to remove search bar 
+                         )) %>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
   formatRound(columns=c('moe'), digits = 2) %>% 
   formatPercentage(9:13, 1)
@@ -241,14 +305,20 @@ datatable(r_not_lf_dis_fmt) %>%
 
 ```
 
+```{r, include=FALSE}
+
+r_not_lf_dis_fmt_text <- r_not_lf_dis_fmt |> 
+  filter(has_dis == 'With a disability')
+```
+
 <!-- X% are not in in the labor force -->
 
-- Of those not in the labor force, 21.8% percent report a disability 
+- Of those not in the labor force, `r round(r_not_lf_dis_fmt_text$share_est_inlf * 100, 1)`% percent report a disability
 
 # Work Experience by Disability Status and Type
 
 ```{r B18121 Work Experience by Disability Status and Type, echo = FALSE}
-we <- get_acs_recs('county', table.names = 'B18121', years = '2022', acs.type = 'acs1')
+we <- get_acs_recs('county', table.names = 'B18121', years = acs_year, acs.type = 'acs1')
 
 we02 <- we %>%
   mutate(variable_sort = str_extract(variable, "\\d{2}$")) %>%
@@ -290,25 +360,46 @@ r_we_grp <- r_we %>%
 r_we_grp_fmt <- r_we_grp %>% 
   select(acs_type, year, name, is_wrk, has_dis, estimate, moe, cv, starts_with('share'))
 
-datatable(r_we_grp_fmt) %>%
+datatable(r_we_grp_fmt,
+          options = list(dom = 'ip' # default is 'lftipr', exclude f to remove search bar 
+                         )
+          ) %>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
   formatRound(columns=c('moe'), digits = 2) %>% 
   formatPercentage(c('cv', 'share_est', 'share_moe'), 1)
 
 ```
-```{r}
-ggplot(r_we_grp_fmt, aes(x = is_wrk, y = share_est, fill = has_dis)) +
-  geom_col(position = 'dodge') +
-  scale_y_continuous(labels = scales::percent_format()) +
-  geom_linerange(aes(ymax = share_est + share_moe, ymin = share_est - share_moe),
-                 position = position_dodge2(width = 1, padding = 0.5)) +
-  labs(y = NULL,
-       x = NULL) +
-  theme(legend.title = element_blank())
+
+```{r Work experience by disability status and type chart}
+# ggplot(r_we_grp_fmt, aes(x = is_wrk, y = share_est, fill = has_dis)) +
+#   geom_col(position = 'dodge') +
+#   scale_y_continuous(labels = scales::percent_format()) +
+#   geom_linerange(aes(ymax = share_est + share_moe, ymin = share_est - share_moe),
+#                  position = position_dodge2(width = 1, padding = 0.5)) +
+#   labs(y = NULL,
+#        x = NULL) +
+#   theme(legend.title = element_blank())
+
+static_column_chart(
+  t = r_we_grp_fmt,
+  y = "share_est",
+  x = "is_wrk",
+  fill = "has_dis",
+  pos = "dodge",
+  xlabel = NULL,
+  ylabel = NULL, 
+  moe = "share_moe",
+  est = "percent",
+  title = "Work Experience by Disability Status",
+  # subtitle = "Income in the past 12 months",
+  source = paste("ACS 1-year", acs_year),
+  alt = NULL,
+) +
+  theme(plot.margin = margin(t = 1, r = 1, b = 1, l = 1, "cm")) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10))
 
 
 ```
-
 
 ```{r}
 
@@ -330,7 +421,10 @@ r_we_dis <- r_we %>%
 r_we_dis_fmt <- r_we_dis %>% 
   select(acs_type, year, name, duration, has_dis, estimate, moe, cv, starts_with('share'))
 
-datatable(r_we_dis_fmt) %>%
+datatable(r_we_dis_fmt,
+          options = list(dom = 'ip' # default is 'lftipr', exclude f to remove search bar 
+                         )
+          ) %>%
   formatRound(columns=c('estimate'), digits = 0) %>% 
   formatRound(columns=c('moe'), digits = 2) %>% 
   formatPercentage(c('cv', 'share_est', 'share_moe'), 1)
@@ -338,18 +432,37 @@ datatable(r_we_dis_fmt) %>%
 ```
 
 ```{r}
-ggplot(r_we_dis_fmt, aes(x = duration, y = share_est, fill = has_dis)) +
-  geom_col(position = 'dodge') +
-  scale_y_continuous(labels = scales::percent_format()) +
-  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) +
-  geom_linerange(aes(ymax = share_est + share_moe, ymin = share_est - share_moe),
-                 position = position_dodge2(width = 1, padding = 0.5)) +
-  labs(y = NULL,
-       x = NULL) +
-  theme(legend.title = element_blank())
+# ggplot(r_we_dis_fmt, aes(x = duration, y = share_est, fill = has_dis)) +
+#   geom_col(position = 'dodge') +
+#   scale_y_continuous(labels = scales::percent_format()) +
+#   scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) +
+#   geom_linerange(aes(ymax = share_est + share_moe, ymin = share_est - share_moe),
+#                  position = position_dodge2(width = 1, padding = 0.5)) +
+#   labs(y = NULL,
+#        x = NULL) +
+#   theme(legend.title = element_blank())
+
+static_column_chart(
+  t = r_we_dis_fmt,
+  y = "share_est",
+  x = "duration",
+  fill = "has_dis",
+  pos = "dodge",
+  xlabel = NULL,
+  ylabel = NULL, 
+  moe = "share_moe",
+  est = "percent",
+  title = "Work Experience by Disability Status and Duration",
+  # subtitle = "Income in the past 12 months",
+  source = paste("ACS 1-year", acs_year),
+  alt = NULL,
+) +
+  theme(plot.margin = margin(t = 1, r = 1, b = 1, l = 1, "cm")) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10))
 ```
 
 <!-- # Disability Employment by Occupation (PUMS) -->
+
 ```{r PUMS test, eval = FALSE, include = FALSE}
 x <- pums_vars_2021 %>% 
   filter(str_detect(var_label, ".*[d|D]isability.*"))
@@ -422,12 +535,17 @@ dis_wrkclass_overview_fmt <- dis_wrkclass_overview04 %>%
 <!-- Workers with disabilities work in various occupations -->
 
 <!-- - 6% of those in the region who have reported a disability did not report the sector they work in -->
+
 <!-- - The remainder of individuals who have reported a disability reported employment in various occupations. The top 3 occupations are: -->
+
 <!--     - Office And Administrative Support Workers (.6%) -->
+
 <!--     - Managerial roles (.5%) -->
+
 <!--     - Sales And Related Workers (.5%) -->
 
 <!-- **Disability status by Occupation (with disability only)** -->
+
 ```{r, eval=FALSE}
 dis_wrkclass_overview_fmt_disonly <- dis_wrkclass_overview_fmt %>% 
   filter(DIS == 'With a disability')
@@ -438,7 +556,9 @@ datatable(dis_wrkclass_overview_fmt_disonly) %>%
   formatPercentage(8:9, 1)
 
 ```
+
 <!-- **Detailed Disability Status by Occupation** -->
+
 ```{r, eval=FALSE}
 datatable(dis_wrkclass_overview_fmt) %>%
   formatRound(columns=c('count'), digits = 0) %>% 
@@ -446,9 +566,13 @@ datatable(dis_wrkclass_overview_fmt) %>%
   formatPercentage(8:9, 1)
 ```
 
-# Disability Employment by Job Sectors (PUMS) 
+# Disability Employment by Job Sectors (PUMS)
 
+## Ignore everything from this point forward
+
+### 2023 1-year PUMS not available yet
 <!-- ## PSRC Land Use Modeling Job Sectors -->
+
 ```{r PUMS model job sectors, eval=FALSE}
 
 dis_modsect_overview_fmt_2019 <- create_modsect_pums_table(span = 1, dyear = 2019)
@@ -467,13 +591,13 @@ write.xlsx(dis_modsect_overview_fmt, file.path(outdir, "disability_landusemod_pu
 ```
 
 <!-- **Detailed Disability Status by Modeling Sectors** -->
+
 ```{r, eval=FALSE}
 datatable(dis_modsect_overview_fmt) %>%
   formatRound(columns=c('count'), digits = 0) %>% 
   formatRound(columns=c('count_moe'), digits = 2) %>% 
   formatPercentage(7:9, 1)
 ```
-
 
 ```{r, eval=FALSE}
 dis_modsect_overview_fmt_plot <- dis_modsect_overview_fmt %>% 
@@ -496,6 +620,7 @@ ggplot(dis_modsect_overview_fmt_plot, aes(x = reorder(sector, -share), y = share
         axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=.5))
 
 ```
+
 <!-- Workers with Disabilities by Job Sector; the sectors listed are used for PSRC's land use modeling -->
 
 <!-- **2019** -->
@@ -506,22 +631,28 @@ ggplot(dis_modsect_overview_fmt_plot, aes(x = reorder(sector, -share), y = share
 
 <!-- **2022** -->
 
+## PSRC Covered Employment Job Sectors
 
+<!-- run this chunk for trend! -->
 
-## PSRC Covered Employment Job Sectors 
-```{r PUMS Covered Employment job sectors}
+<!-- October, 17, 2024 2023 PUMS 1 year -->
+
+```{r PUMS Covered Employment job sectors, warning=FALSE}
 
 dis_covemp_2019 <- create_covempsect_pums_table(span = 1, dyear = 2019)
 dis_covemp_2020 <- create_covempsect_pums_table(span = 5, dyear = 2020)
 dis_covemp_2021 <- create_covempsect_pums_table(span = 1, dyear = 2021)
 dis_covemp_2022 <- create_covempsect_pums_table(span = 1, dyear = 2022)
+# dis_covemp_2023 <- create_covempsect_pums_table(span = 1, dyear = 2023)
 
-dis_covemp_fmt <- bind_rows(dis_covemp_2019, dis_covemp_2020, dis_covemp_2021, dis_covemp_2022)
+dis_covemp_fmt <- bind_rows(dis_covemp_2019, dis_covemp_2020, dis_covemp_2021, dis_covemp_2022#, 
+                            # dis_covemp_2023
+                            )
 ```
 
 ```{r export to xlsx, eval=FALSE}
 
-write.xlsx(dis_covemp_fmt, file.path(outdir, paste0("disability_covemp_pums_2019-2022_updated_", Sys.Date(),".xlsx")))
+write.xlsx(dis_covemp_fmt, file.path(outdir, paste0("disability_covemp_pums_2019-", acs_year,"_updated_", Sys.Date(),".xlsx")))
 ```
 
 ```{r}
@@ -530,10 +661,14 @@ datatable(dis_covemp_fmt) %>%
   formatRound(columns=c('count_moe'), digits = 2) %>% 
   formatPercentage(8:10, 1)
 ```
+
 ```{r}
+
+levels_years <- as.character(2019:acs_year)
+
 dis_covemp_fmt_plot <- dis_covemp_fmt %>% 
   mutate(sector = str_extract(STANDARD_JOBSECTOR, "(?<=-).*")) %>% 
-  mutate(DATA_YEAR = factor(DATA_YEAR, levels = c('2019', '2020', '2021', '2022'))) %>% 
+  mutate(DATA_YEAR = factor(DATA_YEAR, levels = levels_years)) %>% 
   filter(!is.na(STANDARD_JOBSECTOR) & DIS == 'With a disability') # a lot of NAs for sector, focus only on disability emp
 
 ggplot(dis_covemp_fmt_plot, aes(x = reorder(sector, -share), y = share, fill = DATA_YEAR)) +
@@ -559,15 +694,15 @@ Workers with Disabilities by Covered Employment Sector
 
 **2020**
 
-
 **2021**
 
-- About 2% of the region's population report a disability while working in the Services sector.
-
+-   About 2% of the region's population report a disability while working in the Services sector.
 
 **2022**
 
-- Increased workers with disabilities in Retail and Public Education
+-   Increased workers with disabilities in Retail and Public Education
+
+**2023**
 
 # Poverty by Disability Status
 
@@ -575,7 +710,8 @@ Workers with Disabilities by Covered Employment Sector
 
 pov_df <- get_acs_recs(geography = 'county',
                        table.names = 'C18130',
-                       years = 2022,
+                       years = acs_year,
+                       # years = 2022,
                        acs.type = 'acs1')
 
 pov_df_denom <- pov_df %>% filter(variable == "C18130_001" & name == 'Region') %>% select(denom = estimate, moe_denom = moe)
@@ -595,6 +731,7 @@ p_df <- pov_df %>%
 ```
 
 ## By Age Group
+
 ```{r}
 p_df %>% 
   select(-denom, -moe_denom, -se) %>% 
@@ -606,7 +743,7 @@ p_df %>%
 
 ```{r export Poverty to xlsx, eval=FALSE}
 
-write.xlsx(p_df, file.path(outdir, paste0("poverty_by_disability_status_by_age_2022_", Sys.Date(),".xlsx")))
+write.xlsx(p_df, file.path(outdir, paste0("poverty_by_disability_status_by_age_", acs_year ,"_", Sys.Date(),".xlsx")))
 ```
 
 ```{r aggregate ages}
@@ -642,14 +779,11 @@ pov_df_all_age %>%
   formatPercentage(c('cv', 'share', 'share_moe'), 1)
 ```
 
-
-
 ```{r export Poverty all ages to xlsx, eval=FALSE}
 
-write.xlsx(pov_df_all_age, file.path(outdir, paste0("poverty_by_disability_status_all_ages_2022_", Sys.Date(),".xlsx")))
+write.xlsx(pov_df_all_age, file.path(outdir, paste0("poverty_by_disability_status_all_ages_", acs_year, "_", Sys.Date(),".xlsx")))
 
 ```
-
 
 # Regional Median Earnings by Disability Status
 
@@ -661,7 +795,8 @@ write.xlsx(pov_df_all_age, file.path(outdir, paste0("poverty_by_disability_statu
 #                         acs.type = 'acs1')
 
 m_earn_pums <- get_psrc_pums(span = 1, 
-                             dyear = 2022, 
+                             dyear = acs_year,
+                             # dyear = 2022, 
                              level = "p",
                              vars = c("ESR","AGEP","DIS","PERNP"))
 
@@ -679,6 +814,7 @@ datatable(m_earn) %>%
 ```
 
 # Charts
+
 ```{r 2022 Labor Force by Disability Status Data}
 # 1. Employment graph
 df_lf <- r_lf_emp_dis_fmt %>% 
@@ -725,6 +861,8 @@ df_lf_dis <- df_lf %>%
 #   theme_void() +
 #   coord_polar(theta = "y")
 
+
+
 e_common(font_family = "Poppins")
 # turn off legend, add width, title
 p_dis <- df_lf_dis %>% filter(has_dis == 'With a disability') |>
@@ -738,7 +876,7 @@ p_dis <- df_lf_dis %>% filter(has_dis == 'With a disability') |>
   e_legend(show = FALSE)|>
    e_text_g(
         style = list(
-            text = "2022 ACS 1-year B18120 Employment Status by Disability Status and Type \n (Civilian Non-institutionalized Population 18 to 64 Years)",
+            text = paste(acs_year, "ACS 1-year B18120 Employment Status by Disability Status and Type \n (Civilian Non-institutionalized Population 18 to 64 Years)"),
             fontSize = 10,
             opacity = .7,
             fill = "grey"
@@ -778,9 +916,10 @@ df_lf_dis_unemp_p <- static_column_chart(
   xlabel = NULL,
   ylabel = NULL, 
   est = "percent",
-  title = "Percent Unemployed by Disability Status 2022",
+  title = paste0("Percent Unemployed by Disability Status", acs_year),
+  # title = "Percent Unemployed by Disability Status 2022",
   subtitle = "",
-  source = "ACS 1-year 2022, B18120 Employment Status by Disability Status and Type \n (Civilian Non-institutionalized Population 18 to 64 Years)",
+  source = paste("ACS 1-year", acs_year, "B18120 Employment Status by Disability Status and Type \n (Civilian Non-institutionalized Population 18 to 64 Years)"),
   alt = NULL,
 ) +
   theme(plot.margin = margin(t = 1, r = 1, b = 1, l = 1, "cm"))
@@ -794,6 +933,8 @@ df_lf_dis_unemp_p
 ```
 
 ```{r  2022 CovEmp Sectors}
+# !!!! This section needs to be refactored so vars aren't hardcoded!!!!
+
 # 3. Table ofwith dis in one col, no dis. of sectors by percentage employed
 dis_type <- unique(dis_covemp_2022$DIS)
 
@@ -901,6 +1042,3 @@ pov_df_aa_p
 # print(pov_df_aa_p)
 # dev.off()  
 ```
-
-
-
