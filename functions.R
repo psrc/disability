@@ -13,9 +13,16 @@ library(tidycensus)
 # Not available:
 # 2020 1 year data
 
+# https://data.census.gov/mdat/#/search?ds=ACSPUMS1Y2023
 # DIS
 # 1 - with a disability
 # 2 - without a disability
+
+# ESR
+# 1 - Civilian employed, at work
+# 2 - Civilian employed, with a job but not at work
+# 4 - Armed Forces, At Work
+# 5 - Armed Forces, With a Job But Not At Work
 
 create_modsect_pums_table <- function(span, dyear) {
   
@@ -87,15 +94,29 @@ create_covempsect_pums_table <- function(span, dyear) {
                         ))   
   
   # filter for Civilian/Armed persons and between 18-64 years
-  pums <- pums %>% filter((grepl("^(Civilian|Armed) ", as.character(ESR)) & between(AGEP, 18,64)))
+  if(dyear == 2023) {
+    pums <- pums %>% filter(ESR %in% c(1,2,4,5) & between(AGEP, 18,64))
+  } else {
+    pums <- pums %>% filter((grepl("^(Civilian|Armed) ", as.character(ESR)) & between(AGEP, 18,64)))
+  }
+
   ## uncomment this line if using CRAN tidycensus
   # pums <- pums %>% filter(ESR %in% c(1,2,4,5) & between(AGEP, 18,64))
-  
+
   df <- psrc_pums_count(pums, 
                         group_vars = c("STANDARD_JOBSECTOR",       
                                        "DIS"                  
                         )) %>% 
     mutate(acs_type = paste0('acs', span))
+  
+  if(dyear == 2023) {
+      df <- df %>%
+        mutate(DIS = as.character(DIS)) %>%
+        mutate(DIS = case_match(DIS,
+                                "1" ~ "With a disability",
+                                "2" ~ "Without a disability",
+                                .default = DIS))
+  }
   
   ## uncomment these lines if using CRAN tidycensus
   # if(dyear == 2022) {
